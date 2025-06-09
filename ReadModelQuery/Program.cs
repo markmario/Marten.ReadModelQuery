@@ -286,7 +286,7 @@ namespace LBS.Foundry.Api
         public decimal? FiveRoundAverageMinutes { get; set; }
         public int? TotalMinutesPlayed { get; set; }
         public int? TotalGames { get; set; }
-        public int? PlayerId { get; set; }
+        public int PlayerId { get; set; }
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public string? FullName { get; set; }
@@ -857,13 +857,6 @@ namespace LBS.Foundry.Api
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Configure JSON serialization to handle interfaces
-            builder.Services.ConfigureHttpJsonOptions(options =>
-            {
-                options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-                options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-            });
-
             // Register custom services first so they're available for other registrations
             builder.Services.AddSingleton<IQueryTypeRegistry>(provider =>
             {
@@ -901,7 +894,7 @@ namespace LBS.Foundry.Api
                 
                 // Configure document storage
                 options.Schema.For<SuperCoachPlayerDataContract>()
-                    .Identity(x => x.PlayerId ?? 0)
+                    .Identity(x => x.PlayerId)
                     .Index(x => x.TeamId)
                     .Index(x => x.Position)
                     .Index(x => x.Season)
@@ -943,7 +936,18 @@ namespace LBS.Foundry.Api
             }
 
             app.UseHttpsRedirection();
-            app.UseFastEndpoints();
+            
+            // Configure FastEndpoints with custom JSON serialization
+            app.UseFastEndpoints(c =>
+            {
+                c.Serializer.Options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+                c.Serializer.Options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+                
+                // Add our custom converter
+                var queryTypeRegistry = app.Services.GetRequiredService<IQueryTypeRegistry>();
+                var searchQueryConverter = new SearchQueryJsonConverter(queryTypeRegistry);
+                c.Serializer.Options.Converters.Add(searchQueryConverter);
+            });
 
             // Seed sample data in development
             if (app.Environment.IsDevelopment())
