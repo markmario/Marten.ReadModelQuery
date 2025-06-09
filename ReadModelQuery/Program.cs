@@ -48,7 +48,7 @@ public class Program
         builder.Services.AddMarten(options =>
         {
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-                ?? "[REDACTED]";
+                ?? throw new InvalidOperationException("DefaultConnection connection string must be configured in appsettings.json or environment variables");
             
             options.Connection(connectionString);
 
