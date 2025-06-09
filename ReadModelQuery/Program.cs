@@ -8,7 +8,9 @@ using ReadModelQuery.Core.Interfaces;
 using ReadModelQuery.Core.Services;
 using ReadModelQuery.Core.Converters;
 using ReadModelQuery.Core.ModelBinding;
+using ReadModelQuery.Core.Extensions;
 using ReadModelQuery.Features.SuperCoachPlayer.Models;
+using ReadModelQuery.Features.SuperCoachPlayer.Configuration;
 
 namespace ReadModelQuery;
 
@@ -42,36 +44,25 @@ public class Program
             options.ModelBinderProviders.Insert(0, new SearchQueryModelBinderProvider());
         });
 
-        // Configure Marten with explicit session type
+        // Configure Marten - the feature modules will register their document configurations
         builder.Services.AddMarten(options =>
         {
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
                 ?? "[REDACTED]";
             
             options.Connection(connectionString);
-            
-            // Register document types
-            options.RegisterDocumentType<SuperCoachPlayerDataContract>();
-            
-            // Configure document storage
-            options.Schema.For<SuperCoachPlayerDataContract>()
-                .Identity(x => x.PlayerId)
-                .Index(x => x.TeamId)
-                .Index(x => x.Position)
-                .Index(x => x.Season)
-                .Index(x => x.Round);
 
             // Schema creation can be handled separately
             // For development, you may need to run migrations manually
         }).UseLightweightSessions(); // Explicitly specify lightweight sessions for better performance
 
+        // Register feature modules
+        builder.Services.AddSuperCoachPlayerFeature();
+
         // Register FastEndpoints
         builder.Services.AddFastEndpoints();
 
         builder.Services.AddSingleton<IQueryService, QueryService>();
-
-        // Auto-register all query handlers using reflection
-        RegisterQueryHandlers(builder.Services);
 
         // Add Swagger
         builder.Services.SwaggerDocument(o =>
@@ -99,16 +90,7 @@ public class Program
         app.UseHttpsRedirection();
         
         // Configure FastEndpoints with custom JSON serialization
-        app.UseFastEndpoints(c =>
-        {
-            c.Serializer.Options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-            c.Serializer.Options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-            
-            // Add our custom converter
-            var queryTypeRegistry = app.Services.GetRequiredService<IQueryTypeRegistry>();
-            var searchQueryConverter = new SearchQueryJsonConverter(queryTypeRegistry);
-            c.Serializer.Options.Converters.Add(searchQueryConverter);
-        });
+        app.UseFastEndpointsWithJsonConfig();
 
         // Seed sample data in development
         if (app.Environment.IsDevelopment())
@@ -117,38 +99,6 @@ public class Program
         }
 
         app.Run();
-    }
-
-    /// <summary>
-    /// Automatically registers all query handlers using reflection
-    /// </summary>
-    private static void RegisterQueryHandlers(IServiceCollection services)
-    {
-        var assemblies = new[] { Assembly.GetExecutingAssembly() };
-        
-        foreach (var assembly in assemblies)
-        {
-            // Find all types that implement IQueryHandler<T>
-            var handlerTypes = assembly.GetTypes()
-                .Where(type => !type.IsAbstract && !type.IsInterface)
-                .Where(type => type.GetInterfaces()
-                    .Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryHandler<>)))
-                .ToList();
-
-            foreach (var handlerType in handlerTypes)
-            {
-                var handlerInterfaces = handlerType.GetInterfaces()
-                    .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryHandler<>));
-
-                foreach (var handlerInterface in handlerInterfaces)
-                {
-                    services.AddScoped(handlerInterface, handlerType);
-                    
-                    // Also register as the concrete type for the QueryService
-                    services.AddScoped(handlerType);
-                }
-            }
-        }
     }
 
     /// <summary>
