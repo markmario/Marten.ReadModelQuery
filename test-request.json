@@ -1,0 +1,11 @@
+{
+  "dataType": "SuperCoachPlayer",
+  "query": {
+    "queryType": "PlayersByTeam",
+    "teamId": 1,
+    "season": 2025
+  },
+  "orderBy": "FirstName ASC",
+  "skip": 0,
+  "take": 10
+} 

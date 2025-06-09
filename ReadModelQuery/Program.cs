@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using JasperFx;
 
 namespace LBS.Foundry.Api
 {
@@ -881,7 +882,7 @@ namespace LBS.Foundry.Api
                 options.ModelBinderProviders.Insert(0, new SearchQueryModelBinderProvider());
             });
 
-            // Configure Marten
+            // Configure Marten with explicit session type
             builder.Services.AddMarten(options =>
             {
                 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
@@ -902,7 +903,8 @@ namespace LBS.Foundry.Api
 
                 // Schema creation can be handled separately
                 // For development, you may need to run migrations manually
-            });
+                options.AutoCreateSchemaObjects = AutoCreate.All;
+            }).UseLightweightSessions(); // Explicitly specify lightweight sessions for better performance
 
             // Register FastEndpoints
             builder.Services.AddFastEndpoints();
@@ -950,10 +952,10 @@ namespace LBS.Foundry.Api
             });
 
             // Seed sample data in development
-            if (app.Environment.IsDevelopment())
-            {
+            //if (app.Environment.IsDevelopment())
+            //{
                 SeedSampleData(app.Services);
-            }
+            //}
 
             app.Run();
         }
