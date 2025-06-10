@@ -1,3 +1,8 @@
 **/bin/**
 **/obj/**
 **/.idea/**
+
+# Configuration files with sensitive data
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Staging.json
